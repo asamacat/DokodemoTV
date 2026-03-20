@@ -1,0 +1,59 @@
+name: Android_CICD
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+    # 【節約1】ドキュメント更新時はビルドを起動しない
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 【節約2】不慮のループやハングアップで枠を使い切らないよう制限
+    timeout-minutes: 20 
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # リリースノート作成に必要
+
+      - name: set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 【節約3】PRの時はビルド(assemble)のみ、タグの時は配布用(bundle)のみ実行
+      - name: Build with Gradle
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            ./gradlew bundleRelease
+          else
+            ./gradlew assembleDebug
+          fi
+
+      # 【自動化】タグが打たれた時だけ「リリース」を作成
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/bundle/release/*.aab
+          generate_release_notes: true # 【自動化】GitHubがコミット履歴からノートを自動生成
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: ./gradlew build
