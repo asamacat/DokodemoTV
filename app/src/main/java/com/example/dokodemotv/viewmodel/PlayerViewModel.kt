@@ -6,10 +6,12 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import com.example.dokodemotv.model.ChannelItem
+import com.example.dokodemotv.repository.ChannelRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-data class ChannelSource(val name: String, val channels: List<String>)
+data class ChannelSource(val name: String, val channels: List<ChannelItem>)
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(application).build()
@@ -32,11 +34,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val files = rootDoc.listFiles()
         val newSources = mutableListOf<ChannelSource>()
 
-        files.filter { it.name?.endsWith(".txt") == true }.forEach { file ->
+        files.filter { it.name?.endsWith(".txt") == true || it.name?.endsWith(".csv") == true }.forEach { file ->
             val content = getApplication<Application>().contentResolver.openInputStream(file.uri)?.bufferedReader()?.use { it.readText() }
             if (content != null) {
-                val channels = content.lines().filter { it.isNotBlank() }
-                newSources.add(ChannelSource(file.name ?: "Unknown", channels))
+                val channels = ChannelRepository.parseChannelList(content)
+                val categoryName = file.name?.substringBeforeLast(".") ?: "Unknown"
+                newSources.add(ChannelSource(categoryName, channels))
             }
         }
         _sources.value = newSources
