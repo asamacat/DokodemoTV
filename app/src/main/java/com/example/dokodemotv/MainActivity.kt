@@ -19,9 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import android.view.KeyEvent
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
@@ -116,26 +113,7 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
                     .padding(padding),
                 color = MaterialTheme.colorScheme.background
             ) {
-                VideoPlayerContent(
-                    url = selectedUrl,
-                    viewModel = viewModel,
-                    onChannelUp = {
-                        val allChannels = sources.flatMap { it.channels }
-                        val currentIndex = allChannels.indexOf(selectedUrl)
-                        if (currentIndex != -1 && allChannels.isNotEmpty()) {
-                            val nextIndex = (currentIndex + 1) % allChannels.size
-                            selectedUrl = allChannels[nextIndex]
-                        }
-                    },
-                    onChannelDown = {
-                        val allChannels = sources.flatMap { it.channels }
-                        val currentIndex = allChannels.indexOf(selectedUrl)
-                        if (currentIndex != -1 && allChannels.isNotEmpty()) {
-                            val prevIndex = if (currentIndex - 1 < 0) allChannels.size - 1 else currentIndex - 1
-                            selectedUrl = allChannels[prevIndex]
-                        }
-                    }
-                )
+                VideoPlayerContent(url = selectedUrl, viewModel = viewModel)
             }
         }
     }
@@ -143,61 +121,20 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayerContent(
-    url: String,
-    viewModel: PlayerViewModel,
-    onChannelUp: () -> Unit = {},
-    onChannelDown: () -> Unit = {}
-) {
+fun VideoPlayerContent(url: String, viewModel: PlayerViewModel) {
     val context = LocalContext.current
     val exoPlayer = viewModel.exoPlayer
-    val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(url) {
         viewModel.preparePlayer(url)
-        focusRequester.requestFocus()
     }
 
     AndroidView(
-        modifier = Modifier
-            .fillMaxSize()
-            .focusRequester(focusRequester),
+        modifier = Modifier.fillMaxSize(),
         factory = {
             PlayerView(context).apply {
                 player = exoPlayer
                 useController = true
-                isFocusable = true
-                isFocusableInTouchMode = true
-
-                setOnKeyListener { _, keyCode, event ->
-                    if (event.action == android.view.KeyEvent.ACTION_DOWN) {
-                        when (keyCode) {
-                            android.view.KeyEvent.KEYCODE_DPAD_UP -> {
-                                onChannelUp()
-                                true
-                            }
-                            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
-                                onChannelDown()
-                                true
-                            }
-                            android.view.KeyEvent.KEYCODE_DPAD_LEFT, android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                if (!isControllerFullyVisible) {
-                                    showController()
-                                }
-                                false
-                            }
-                            android.view.KeyEvent.KEYCODE_DPAD_CENTER, android.view.KeyEvent.KEYCODE_ENTER -> {
-                                if (!isControllerFullyVisible) {
-                                    showController()
-                                }
-                                false
-                            }
-                            else -> false
-                        }
-                    } else {
-                        false
-                    }
-                }
             }
         }
     )
