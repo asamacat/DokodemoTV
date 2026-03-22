@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <issue id="MissingTvBanner" severity="ignore" />
+    <issue id="UnsafeOptInUsageError" severity="ignore" />
+    <issue id="ImpliedTouchscreenHardware" severity="ignore" />
+</lint>
