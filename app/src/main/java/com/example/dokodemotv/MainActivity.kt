@@ -1,35 +1,119 @@
 package com.example.dokodemotv
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.annotation.OptIn
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
+import androidx.activity.result.contract.ActivityResultContracts
+import kotlin.OptIn
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import com.example.dokodemotv.viewmodel.PlayerViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                DokodemoTVApp()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
+    val context = LocalContext.current
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val sources by viewModel.sources.collectAsState()
+    var selectedUrl by remember { mutableStateOf("https://linear-abematv.akamaized.net/preview/channel/onepiece/playlist.m3u8") }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            viewModel.loadPlaylists(it)
+        }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { launcher.launch(null) },
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    // PoC用: AbemaTVの低画質/高画質ストリーム等の一部ハードコードした初期実装
-                    VideoPlayerContent(url = "https://linear-abematv.akamaized.net/preview/channel/onepiece/playlist.m3u8")
+                    Text("Select Playlist Folder")
                 }
+                Divider()
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(sources) { source ->
+                        Text(
+                            text = "Source: ${source.name}",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        source.channels.forEachIndexed { index, channelUrl ->
+                            NavigationDrawerItem(
+                                label = { Text("Channel ${index + 1}: ${channelUrl.takeLast(40)}") },
+                                selected = selectedUrl == channelUrl,
+                                onClick = {
+                                    selectedUrl = channelUrl
+                                    scope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        }
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                }
+            }
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("DokodemoTV PoC") },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                VideoPlayerContent(url = selectedUrl, viewModel = viewModel)
             }
         }
     }
@@ -37,7 +121,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayerContent(url: String, viewModel: PlayerViewModel = viewModel()) {
+fun VideoPlayerContent(url: String, viewModel: PlayerViewModel) {
     val context = LocalContext.current
     val exoPlayer = viewModel.exoPlayer
 
@@ -50,7 +134,7 @@ fun VideoPlayerContent(url: String, viewModel: PlayerViewModel = viewModel()) {
         factory = {
             PlayerView(context).apply {
                 player = exoPlayer
-                useController = true // TV向けの場合、D-Padで操作しやすいコントローラーUIへの最適化が必要
+                useController = true
             }
         }
     )

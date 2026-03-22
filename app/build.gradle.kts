@@ -29,6 +29,7 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs = freeCompilerArgs + "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api"
     }
 
     buildFeatures {
@@ -53,4 +54,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.1.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.1.1")
     implementation("androidx.media3:media3-ui:1.1.1")
+
+    // DocumentFile for Scoped Storage folder access
+    implementation("androidx.documentfile:documentfile:1.0.1")
 }
