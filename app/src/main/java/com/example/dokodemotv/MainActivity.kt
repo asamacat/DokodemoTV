@@ -9,14 +9,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.example.dokodemotv.viewmodel.PlayerViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,30 +37,21 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayerContent(url: String) {
+fun VideoPlayerContent(url: String, viewModel: PlayerViewModel = viewModel()) {
     val context = LocalContext.current
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(url)
-            setMediaItem(mediaItem)
-            prepare()
-            playWhenReady = true
-        }
+    val exoPlayer = viewModel.exoPlayer
+
+    LaunchedEffect(url) {
+        viewModel.preparePlayer(url)
     }
 
-    DisposableEffect(
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = {
-                PlayerView(context).apply {
-                    player = exoPlayer
-                    useController = true // TV向けの場合、D-Padで操作しやすいコントローラーUIへの最適化が必要
-                }
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = {
+            PlayerView(context).apply {
+                player = exoPlayer
+                useController = true // TV向けの場合、D-Padで操作しやすいコントローラーUIへの最適化が必要
             }
-        )
-    ) {
-        onDispose {
-            exoPlayer.release()
         }
-    }
+    )
 }
