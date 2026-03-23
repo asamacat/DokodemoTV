@@ -35,9 +35,15 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import coil.compose.rememberAsyncImagePainter
 import com.example.dokodemotv.model.ChannelItem
+import android.widget.Toast
+import android.content.ActivityNotFoundException
+import android.os.Environment
+import android.Manifest
+import java.io.File
 import com.example.dokodemotv.viewmodel.PlayerViewModel
 import com.example.dokodemotv.ui.theme.DokodemoTVTheme
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,21 +61,66 @@ class MainActivity : ComponentActivity() {
 fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
     val context = LocalContext.current
     val sources by viewModel.sources.collectAsState()
-    var selectedUrl by remember { mutableStateOf("https://linear-abematv.akamaized.net/preview/channel/onepiece/playlist.m3u8") }
+    var selectedUrl by remember { mutableStateOf<String?>(viewModel.initialUrl) }
 
     var showBottomSheet by remember { mutableStateOf(false) }
     var selectedTabIndex by remember { mutableStateOf(0) }
-    var showOverlayMenu by remember { mutableStateOf(true) }
+    var showMenuButton by remember { mutableStateOf(true) }
+
+    // Auto-hide menu button after 15 seconds if a channel is selected and bottom sheet is closed
+    LaunchedEffect(selectedUrl, showBottomSheet) {
+        if (!showBottomSheet && selectedUrl != null) {
+            showMenuButton = true
+            delay(15000)
+            showMenuButton = false
+        }
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         uri?.let {
-            context.contentResolver.takePersistableUriPermission(
-                it,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-            viewModel.loadPlaylists(it)
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                viewModel.loadPlaylists(it)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "設定を保存できませんでした", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val downloadFolder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DokodemoTV")
+            viewModel.loadPlaylists(downloadFolder)
+            if (viewModel.sources.value.isEmpty()) {
+                Toast.makeText(context, "Download/DokodemoTV フォルダ内にプレイリストが見つかりません。作成してください", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "Download/DokodemoTV フォルダから読み込みました", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(context, "権限拒否: Download/DokodemoTV フォルダを読み込めません", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val safeLaunchFolderPicker = {
+        try {
+            launcher.launch(null)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "標準のファイルマネージャが無いため、専用フォルダを探します", Toast.LENGTH_LONG).show()
+            permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (selectedUrl == null) {
+            safeLaunchFolderPicker()
         }
     }
 
@@ -82,40 +133,25 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
                     if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN &&
                         keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                         showBottomSheet = true
+                        showMenuButton = true
                         true
                     } else if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN &&
                                keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        showOverlayMenu = !showOverlayMenu
+                        showMenuButton = true
                         true
                     } else {
                         false
                     }
                 }
         ) {
-            VideoPlayerContent(url = selectedUrl, viewModel = viewModel)
+            VideoPlayerContent(
+                url = selectedUrl, 
+                viewModel = viewModel,
+                onDpadUp = { showBottomSheet = true; showMenuButton = true },
+                onShowControls = { showMenuButton = true }
+            )
 
-            if (showOverlayMenu) {
-                // Top Right Action Buttons (Load Folder & Toggle Overlay)
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ElevatedButton(
-                        onClick = { launcher.launch(null) },
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Text("Load Folder")
-                    }
-                    ElevatedButton(
-                        onClick = { showOverlayMenu = !showOverlayMenu },
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Text("Hide Menu")
-                    }
-                }
-
+            if (showMenuButton) {
                 // Top Left Menu Button
                 FilledIconButton(
                     onClick = { showBottomSheet = true },
@@ -149,6 +185,23 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
             dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                
+                // Top Action Bar inside Bottom Sheet for Settings / Load Folder
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    ElevatedButton(
+                        onClick = { safeLaunchFolderPicker() },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = if (sources.isEmpty()) Modifier.focusRequester(initialFocusRequester) else Modifier
+                    ) {
+                        Text("📁 Load Folder / Settings")
+                    }
+                }
+
                 if (sources.isNotEmpty()) {
                     ScrollableTabRow(
                         selectedTabIndex = selectedTabIndex,
@@ -276,7 +329,12 @@ fun ChannelListItem(channel: ChannelItem, isSelected: Boolean, onClick: () -> Un
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayerContent(url: String?, viewModel: PlayerViewModel) {
+fun VideoPlayerContent(
+    url: String?, 
+    viewModel: PlayerViewModel,
+    onDpadUp: () -> Unit,
+    onShowControls: () -> Unit
+) {
     val context = LocalContext.current
     val exoPlayer = viewModel.exoPlayer
 
@@ -285,17 +343,26 @@ fun VideoPlayerContent(url: String?, viewModel: PlayerViewModel) {
     }
 
     AndroidView(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize()
+            .clickable { onShowControls() },
         factory = {
             PlayerView(context).apply {
                 player = exoPlayer
                 useController = true
+                
+                setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+                    if (visibility == android.view.View.VISIBLE) {
+                        onShowControls()
+                    }
+                })
+
                 // Pass D-Pad Up events back up if the controller doesn't handle them
                 setOnKeyListener { _, keyCode, event ->
                     if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                        // Let the parent (Compose onKeyEvent) handle it
-                        false
-                    } else if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        onDpadUp()
+                        true
+                    } else if (event.action == KeyEvent.ACTION_DOWN && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+                        onShowControls()
                         false
                     } else {
                         false

@@ -16,6 +16,7 @@ import com.example.dokodemotv.util.CacheManager
 import com.example.dokodemotv.util.PreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
 
 data class ChannelSource(val name: String, val channels: List<ChannelItem>)
 
@@ -23,6 +24,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val prefs = PreferencesManager(application)
     var exoPlayer: ExoPlayer
     private var currentUrl: String? = null
+
+    val initialUrl: String?
+        get() = prefs.lastWatchedUrl
 
     private val _sources = MutableStateFlow<List<ChannelSource>>(emptyList())
     val sources = _sources.asStateFlow()
@@ -130,6 +134,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         prefs.savedFolderUri = folderUri.toString()
+        _sources.value = newSources
+    }
+
+    fun loadPlaylists(folder: File) {
+        if (!folder.exists() || !folder.isDirectory) return
+        val files = folder.listFiles() ?: return
+        val newSources = mutableListOf<ChannelSource>()
+
+        files.filter { it.name.endsWith(".txt") || it.name.endsWith(".csv") }.forEach { file ->
+            val content = file.readText()
+            val channels = ChannelRepository.parseChannelList(content)
+            val categoryName = file.name.substringBeforeLast(".")
+            newSources.add(ChannelSource(categoryName, channels))
+        }
+
+        // We don't save the URI for File paths because it's a fixed fallback path.
         _sources.value = newSources
     }
 
