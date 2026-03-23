@@ -38,6 +38,9 @@ import com.example.dokodemotv.model.ChannelItem
 import android.widget.Toast
 import android.content.ActivityNotFoundException
 import android.os.Environment
+import android.os.Build
+import android.provider.Settings
+import android.net.Uri
 import android.Manifest
 import java.io.File
 import com.example.dokodemotv.viewmodel.PlayerViewModel
@@ -93,7 +96,7 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
         }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
@@ -109,12 +112,51 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
         }
     }
 
+    val manageStorageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Environment.isExternalStorageManager()) {
+                val downloadFolder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DokodemoTV")
+                viewModel.loadPlaylists(downloadFolder)
+                if (viewModel.sources.value.isEmpty()) {
+                    Toast.makeText(context, "Download/DokodemoTV フォルダ内にプレイリストが見つかりません。作成してください", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "Download/DokodemoTV フォルダから読み込みました", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(context, "権限拒否: すべてのファイルへのアクセス権限が必要です", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     val safeLaunchFolderPicker = {
         try {
             launcher.launch(null)
         } catch (e: ActivityNotFoundException) {
-            Toast.makeText(context, "標準のファイルマネージャが無いため、専用フォルダを探します", Toast.LENGTH_LONG).show()
-            permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+            Toast.makeText(context, "標準のファイルマネージャが無いため、権限を要求します", Toast.LENGTH_LONG).show()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (!Environment.isExternalStorageManager()) {
+                    try {
+                        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                        intent.data = Uri.parse("package:${context.packageName}")
+                        manageStorageLauncher.launch(intent)
+                    } catch (ex: Exception) {
+                        val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                        manageStorageLauncher.launch(intent)
+                    }
+                } else {
+                    val downloadFolder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DokodemoTV")
+                    viewModel.loadPlaylists(downloadFolder)
+                    if (viewModel.sources.value.isEmpty()) {
+                        Toast.makeText(context, "Download/DokodemoTV フォルダ内にプレイリストが見つかりません", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "Download/DokodemoTV フォルダから読み込みました", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else {
+                permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
         }
     }
 
