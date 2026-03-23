@@ -36,13 +36,14 @@ import androidx.media3.ui.PlayerView
 import coil.compose.rememberAsyncImagePainter
 import com.example.dokodemotv.model.ChannelItem
 import com.example.dokodemotv.viewmodel.PlayerViewModel
+import com.example.dokodemotv.ui.theme.DokodemoTVTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            DokodemoTVTheme {
                 DokodemoTVApp()
             }
         }
@@ -101,22 +102,32 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(onClick = { launcher.launch(null) }) {
+                    ElevatedButton(
+                        onClick = { launcher.launch(null) },
+                        shape = MaterialTheme.shapes.medium
+                    ) {
                         Text("Load Folder")
                     }
-                    Button(onClick = { showOverlayMenu = !showOverlayMenu }) {
+                    ElevatedButton(
+                        onClick = { showOverlayMenu = !showOverlayMenu },
+                        shape = MaterialTheme.shapes.medium
+                    ) {
                         Text("Hide Menu")
                     }
                 }
 
                 // Top Left Menu Button
-                IconButton(
+                FilledIconButton(
                     onClick = { showBottomSheet = true },
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(16.dp)
+                        .padding(16.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.Menu, contentDescription = "Menu")
                 }
             }
         }
@@ -132,30 +143,45 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
 
         ModalBottomSheet(
             onDismissRequest = { showBottomSheet = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 if (sources.isNotEmpty()) {
                     ScrollableTabRow(
                         selectedTabIndex = selectedTabIndex,
-                        edgePadding = 8.dp
+                        edgePadding = 8.dp,
+                        containerColor = Color.Transparent,
+                        divider = {}
                     ) {
                         sources.forEachIndexed { index, source ->
                             Tab(
                                 selected = selectedTabIndex == index,
                                 onClick = { selectedTabIndex = index },
-                                text = { Text(source.name) },
+                                text = {
+                                    Text(
+                                        source.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (selectedTabIndex == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
                                 modifier = Modifier.focusRequester(if (index == selectedTabIndex) initialFocusRequester else FocusRequester())
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     val selectedChannels = sources.getOrNull(selectedTabIndex)?.channels ?: emptyList()
 
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 400.dp)
+                            .heightIn(max = 500.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(selectedChannels) { channel ->
                             ChannelListItem(
@@ -169,8 +195,17 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
                         }
                     }
                 } else {
-                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("No channels loaded. Please load a folder.")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No channels loaded. Please load a folder.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -182,18 +217,30 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
 fun ChannelListItem(channel: ChannelItem, isSelected: Boolean, onClick: () -> Unit) {
     var isFocused by remember { mutableStateOf(false) }
 
+    val containerColor = when {
+        isSelected -> MaterialTheme.colorScheme.primaryContainer
+        isFocused -> MaterialTheme.colorScheme.surfaceVariant
+        else -> Color.Transparent
+    }
+
+    val contentColor = when {
+        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+        isFocused -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .onFocusChanged { isFocused = it.isFocused }
             .focusable()
             .clickable(onClick = onClick)
-            .padding(8.dp),
-        color = if (isFocused) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-        shape = MaterialTheme.shapes.medium
+            .padding(horizontal = 8.dp),
+        color = containerColor,
+        shape = MaterialTheme.shapes.large
     ) {
         Row(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (channel.iconUrl != null) {
@@ -205,20 +252,23 @@ fun ChannelListItem(channel: ChannelItem, isSelected: Boolean, onClick: () -> Un
                         .padding(end = 16.dp)
                 )
             } else {
-                Box(
+                Surface(
                     modifier = Modifier
                         .size(48.dp)
                         .padding(end = 16.dp),
-                    contentAlignment = Alignment.Center
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
-                    Text("📺", style = MaterialTheme.typography.headlineSmall)
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("📺", style = MaterialTheme.typography.titleLarge)
+                    }
                 }
             }
 
             Text(
                 text = channel.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.titleMedium,
+                color = contentColor
             )
         }
     }
