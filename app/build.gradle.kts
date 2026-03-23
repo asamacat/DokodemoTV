@@ -58,6 +58,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.1.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.1.1")
     implementation("androidx.media3:media3-ui:1.1.1")
+    implementation("androidx.media3:media3-datasource:1.1.1")
+    implementation("androidx.media3:media3-database:1.1.1")
 
     // DocumentFile for Scoped Storage folder access
     implementation("androidx.documentfile:documentfile:1.0.1")
