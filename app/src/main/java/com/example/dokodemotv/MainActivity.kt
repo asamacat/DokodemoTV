@@ -276,12 +276,12 @@ fun ChannelListItem(channel: ChannelItem, isSelected: Boolean, onClick: () -> Un
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayerContent(url: String, viewModel: PlayerViewModel) {
+fun VideoPlayerContent(url: String?, viewModel: PlayerViewModel) {
     val context = LocalContext.current
     val exoPlayer = viewModel.exoPlayer
 
     LaunchedEffect(url) {
-        viewModel.preparePlayer(url)
+        if (url != null) viewModel.preparePlayer(url)
     }
 
     AndroidView(
