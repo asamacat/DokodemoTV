@@ -31,18 +31,20 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
+          # cache: gradle is now handled by gradle/actions/setup-gradle
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.8
 
-      # 【節約3】PRの時はビルド(assemble)のみ、タグの時は配布用(bundle)のみ実行
+      # 【節約3】PRの時はビルド(assemble)のみ、タグの時は配布用(assembleRelease)のみ実行
       - name: Build with Gradle
         run: |
           if [[ $GITHUB_REF == refs/tags/* ]]; then
-            ./gradlew bundleRelease
+            gradle assembleRelease
           else
-            ./gradlew assembleDebug
+            gradle assembleDebug
           fi
 
       # 【自動化】タグが打たれた時だけ「リリース」を作成
@@ -50,10 +52,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/bundle/release/*.aab
+          # distribute unsigned release APK for manual installation
+          files: app/build/outputs/apk/release/*.apk
           generate_release_notes: true # 【自動化】GitHubがコミット履歴からノートを自動生成
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: ./gradlew build
