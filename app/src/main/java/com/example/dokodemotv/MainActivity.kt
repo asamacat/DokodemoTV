@@ -33,6 +33,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+
+import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.Player
 import coil.compose.rememberAsyncImagePainter
 import com.example.dokodemotv.model.ChannelItem
 import android.widget.Toast
@@ -66,9 +69,23 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
     val sources by viewModel.sources.collectAsState()
     var selectedUrl by remember { mutableStateOf<String?>(viewModel.initialUrl) }
 
+    // Flat list of all channels for zapping
+    val allChannels = remember(sources) {
+        sources.flatMap { it.channels }
+    }
+
     var showBottomSheet by remember { mutableStateOf(false) }
     var selectedTabIndex by remember { mutableStateOf(0) }
     var showMenuButton by remember { mutableStateOf(true) }
+
+    var zapMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(zapMessage) {
+        if (zapMessage != null) {
+            delay(2000)
+            zapMessage = null
+        }
+    }
 
     // Auto-hide menu button after 15 seconds if a channel is selected and bottom sheet is closed
     LaunchedEffect(selectedUrl, showBottomSheet) {
@@ -190,7 +207,25 @@ val permissionLauncher = rememberLauncherForActivityResult(
                 url = selectedUrl, 
                 viewModel = viewModel,
                 onDpadUp = { showBottomSheet = true; showMenuButton = true },
-                onShowControls = { showMenuButton = true }
+                onShowControls = { showMenuButton = true },
+                onZapNext = {
+                    if (allChannels.isNotEmpty()) {
+                        val currentIndex = allChannels.indexOfFirst { it.streamUrl == selectedUrl }
+                        val nextIndex = if (currentIndex == -1 || currentIndex == allChannels.lastIndex) 0 else currentIndex + 1
+                        val nextChannel = allChannels[nextIndex]
+                        selectedUrl = nextChannel.streamUrl
+                        zapMessage = nextChannel.name
+                    }
+                },
+                onZapPrevious = {
+                    if (allChannels.isNotEmpty()) {
+                        val currentIndex = allChannels.indexOfFirst { it.streamUrl == selectedUrl }
+                        val prevIndex = if (currentIndex <= 0) allChannels.lastIndex else currentIndex - 1
+                        val prevChannel = allChannels[prevIndex]
+                        selectedUrl = prevChannel.streamUrl
+                        zapMessage = prevChannel.name
+                    }
+                }
             )
 
             if (showMenuButton) {
@@ -206,6 +241,27 @@ val permissionLauncher = rememberLauncherForActivityResult(
                     )
                 ) {
                     Icon(Icons.Default.Menu, contentDescription = "Menu")
+                }
+            }
+
+            // Zap Message Overlay
+            if (zapMessage != null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = zapMessage ?: "",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(24.dp)
+                        )
+                    }
                 }
             }
         }
@@ -375,10 +431,38 @@ fun VideoPlayerContent(
     url: String?, 
     viewModel: PlayerViewModel,
     onDpadUp: () -> Unit,
-    onShowControls: () -> Unit
+    onShowControls: () -> Unit,
+    onZapNext: () -> Unit = {},
+    onZapPrevious: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val exoPlayer = viewModel.exoPlayer
+
+    val forwardingPlayer = remember(exoPlayer, onZapNext, onZapPrevious) {
+        object : ForwardingPlayer(exoPlayer) {
+            override fun getAvailableCommands(): Player.Commands {
+                return super.getAvailableCommands().buildUpon()
+                    .add(Player.COMMAND_SEEK_TO_NEXT)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    .build()
+            }
+
+            override fun isCommandAvailable(command: @Player.Command Int): Boolean {
+                if (command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_PREVIOUS) {
+                    return true
+                }
+                return super.isCommandAvailable(command)
+            }
+
+            override fun seekToNext() {
+                onZapNext()
+            }
+
+            override fun seekToPrevious() {
+                onZapPrevious()
+            }
+        }
+    }
 
     LaunchedEffect(url) {
         if (url != null) viewModel.preparePlayer(url)
@@ -389,7 +473,7 @@ fun VideoPlayerContent(
             .clickable { onShowControls() },
         factory = {
             PlayerView(context).apply {
-                player = exoPlayer
+                player = forwardingPlayer
                 useController = true
                 
                 setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
