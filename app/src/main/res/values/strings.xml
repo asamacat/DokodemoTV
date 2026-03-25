@@ -1,7 +1,3 @@
 <resources>
     <string name="app_name">DokodemoTV</string>
-    <string name="menu_content_description">Menu</string>
-    <string name="load_folder_settings">📁 Load Folder / Settings</string>
-    <string name="no_channels_loaded">No channels loaded. Please load a folder.</string>
-    <string name="channel_icon_content_description">%1$s icon</string>
 </resources>
