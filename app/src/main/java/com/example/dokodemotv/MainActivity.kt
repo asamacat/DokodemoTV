@@ -46,6 +46,13 @@ import com.example.dokodemotv.viewmodel.PlayerViewModel
 import com.example.dokodemotv.ui.theme.DokodemoTVTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import com.example.dokodemotv.util.UpdateChecker
+import com.example.dokodemotv.util.ApkDownloader
+import com.example.dokodemotv.util.ApkInstaller
+import android.content.IntentFilter
+import android.app.DownloadManager
+import android.os.Build
+import android.content.Context
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +75,17 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
     var showBottomSheet by remember { mutableStateOf(false) }
     var selectedTabIndex by remember { mutableStateOf(0) }
     var showMenuButton by remember { mutableStateOf(true) }
+
+    var updateInfo by remember { mutableStateOf<UpdateChecker.UpdateInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val info = UpdateChecker.checkForUpdates(context)
+        if (info.isUpdateAvailable && info.downloadUrl != null) {
+            updateInfo = info
+            showUpdateDialog = true
+        }
+    }
 
     // Auto-hide menu button after 15 seconds if a channel is selected and bottom sheet is closed
     LaunchedEffect(selectedUrl, showBottomSheet) {
@@ -124,6 +142,43 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
         if (selectedUrl == null) {
             safeLaunchFolderPicker()
         }
+    }
+
+    if (showUpdateDialog && updateInfo != null) {
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            title = { Text("アップデートのお知らせ") },
+            text = { Text("新しいバージョン (v${updateInfo?.latestVersion}) が利用可能です。アップデートしますか？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUpdateDialog = false
+                        updateInfo?.downloadUrl?.let {
+                            val downloadId = ApkDownloader.downloadApk(context, it)
+                            if (downloadId != -1L) {
+                                val installer = ApkInstaller(context, downloadId)
+                                val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    context.registerReceiver(installer, filter, Context.RECEIVER_EXPORTED)
+                                } else {
+                                    context.registerReceiver(installer, filter)
+                                }
+                                Toast.makeText(context, "ダウンロードを開始しました...", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "ダウンロードの開始に失敗しました", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                ) {
+                    Text("アップデート")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdateDialog = false }) {
+                    Text("あとで")
+                }
+            }
+        )
     }
 
     Scaffold { padding ->
