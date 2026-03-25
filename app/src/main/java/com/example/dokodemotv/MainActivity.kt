@@ -27,8 +27,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.res.stringResource
-import com.example.dokodemotv.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -165,7 +163,7 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
                         contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.menu_content_description))
+                    Icon(Icons.Default.Menu, contentDescription = "Menu")
                 }
             }
         }
@@ -200,7 +198,7 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
                         shape = MaterialTheme.shapes.medium,
                         modifier = if (sources.isEmpty()) Modifier.focusRequester(initialFocusRequester) else Modifier
                     ) {
-                        Text(stringResource(R.string.load_folder_settings))
+                        Text("📁 Load Folder / Settings")
                     }
                 }
 
@@ -257,7 +255,7 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            stringResource(R.string.no_channels_loaded),
+                            "No channels loaded. Please load a folder.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -301,7 +299,7 @@ fun ChannelListItem(channel: ChannelItem, isSelected: Boolean, onClick: () -> Un
             if (channel.iconUrl != null) {
                 Image(
                     painter = rememberAsyncImagePainter(model = channel.iconUrl),
-                    contentDescription = stringResource(R.string.channel_icon_content_description, channel.name),
+                    contentDescription = "${channel.name} icon",
                     modifier = Modifier
                         .size(48.dp)
                         .padding(end = 16.dp)
