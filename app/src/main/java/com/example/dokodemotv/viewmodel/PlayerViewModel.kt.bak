@@ -39,7 +39,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun buildPlayer(): ExoPlayer {
         val app = getApplication<Application>()
-        // val cache = CacheManager.getCache(app, prefs.cacheSizeMb)
+        val cache = CacheManager.getCache(app, prefs.cacheSizeMb)
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
