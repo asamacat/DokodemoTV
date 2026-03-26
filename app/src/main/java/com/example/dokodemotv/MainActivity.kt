@@ -472,7 +472,18 @@ fun VideoPlayerContent(
         modifier = Modifier.fillMaxSize()
             .clickable { onShowControls() },
         factory = {
-            PlayerView(context).apply {
+            object : PlayerView(context) {
+                override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                        onDpadUp()
+                        return true
+                    } else if (event.action == KeyEvent.ACTION_DOWN && (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER)) {
+                        onShowControls()
+                        // let super handle it to show/hide controller or do default actions
+                    }
+                    return super.dispatchKeyEvent(event)
+                }
+            }.apply {
                 player = forwardingPlayer
                 useController = true
                 
@@ -481,19 +492,6 @@ fun VideoPlayerContent(
                         onShowControls()
                     }
                 })
-
-                // Pass D-Pad Up events back up if the controller doesn't handle them
-                setOnKeyListener { _, keyCode, event ->
-                    if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                        onDpadUp()
-                        true
-                    } else if (event.action == KeyEvent.ACTION_DOWN && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
-                        onShowControls()
-                        false
-                    } else {
-                        false
-                    }
-                }
             }
         }
     )
