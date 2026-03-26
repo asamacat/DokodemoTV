@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -33,9 +34,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
-
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
+import androidx.media3.common.C
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import coil.compose.rememberAsyncImagePainter
 import com.example.dokodemotv.model.ChannelItem
 import android.widget.Toast
@@ -47,9 +50,12 @@ import android.net.Uri
 import android.Manifest
 import java.io.File
 import com.example.dokodemotv.viewmodel.PlayerViewModel
+import com.example.dokodemotv.viewmodel.DokodemoViewModelFactory
 import com.example.dokodemotv.ui.theme.DokodemoTVTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import com.example.dokodemotv.ui.SettingsScreen
+import android.app.Application
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,10 +70,11 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel()) {
+fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel(factory = DokodemoViewModelFactory(LocalContext.current.applicationContext as Application))) {
     val context = LocalContext.current
     val sources by viewModel.sources.collectAsState()
     var selectedUrl by remember { mutableStateOf<String?>(viewModel.initialUrl) }
+    var showSettings by remember { mutableStateOf(false) }
 
     // Flat list of all channels for zapping
     val allChannels = remember(sources) {
@@ -183,6 +190,11 @@ val permissionLauncher = rememberLauncherForActivityResult(
         }
     }
 
+    if (showSettings) {
+        SettingsScreen(viewModel = viewModel, onBack = { showSettings = false })
+        return
+    }
+
     Scaffold { padding ->
         Box(
             modifier = Modifier
@@ -296,7 +308,14 @@ val permissionLauncher = rememberLauncherForActivityResult(
                         shape = MaterialTheme.shapes.medium,
                         modifier = if (sources.isEmpty()) Modifier.focusRequester(initialFocusRequester) else Modifier
                     ) {
-                        Text("📁 Load Folder / Settings")
+                        Text("📁 Load Folder")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ElevatedButton(
+                        onClick = { showBottomSheet = false; showSettings = true },
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("⚙️ Settings")
                     }
                 }
 
@@ -437,6 +456,8 @@ fun VideoPlayerContent(
 ) {
     val context = LocalContext.current
     val exoPlayer = viewModel.exoPlayer
+    var showTrackSelectionDialog by remember { mutableStateOf(false) }
+    var currentTracks by remember { mutableStateOf<Tracks?>(null) }
 
     val forwardingPlayer = remember(exoPlayer, onZapNext, onZapPrevious) {
         object : ForwardingPlayer(exoPlayer) {
@@ -461,6 +482,18 @@ fun VideoPlayerContent(
             override fun seekToPrevious() {
                 onZapPrevious()
             }
+        }
+    }
+
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onTracksChanged(tracks: Tracks) {
+                currentTracks = tracks
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
         }
     }
 
@@ -495,4 +528,93 @@ fun VideoPlayerContent(
             }
         }
     )
+
+    if (showTrackSelectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showTrackSelectionDialog = false },
+            title = { Text("Audio & Subtitles") },
+            text = {
+                LazyColumn {
+                    val tracks = currentTracks
+                    if (tracks != null) {
+                        val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+                        if (audioGroups.isNotEmpty()) {
+                            item { Text("Audio Tracks", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
+                            audioGroups.forEachIndexed { groupIndex, group ->
+                                for (trackIndex in 0 until group.length) {
+                                    val isSelected = group.isTrackSelected(trackIndex)
+                                    val trackName = group.getTrackFormat(trackIndex).label ?: group.getTrackFormat(trackIndex).language ?: "Track ${trackIndex + 1}"
+                                    item {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().clickable {
+                                                exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                                                    .buildUpon()
+                                                    .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+                                                    .build()
+                                                showTrackSelectionDialog = false
+                                            }.padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(selected = isSelected, onClick = null)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(text = trackName)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        val textGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+                        if (textGroups.isNotEmpty()) {
+                            item { Text("Subtitles", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp)) }
+                            textGroups.forEachIndexed { groupIndex, group ->
+                                for (trackIndex in 0 until group.length) {
+                                    val isSelected = group.isTrackSelected(trackIndex)
+                                    val trackName = group.getTrackFormat(trackIndex).label ?: group.getTrackFormat(trackIndex).language ?: "Track ${trackIndex + 1}"
+                                    item {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().clickable {
+                                                exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                                                    .buildUpon()
+                                                    .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+                                                    .build()
+                                                showTrackSelectionDialog = false
+                                            }.padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(selected = isSelected, onClick = null)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(text = trackName)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        item { Text("No tracks available") }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTrackSelectionDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        FilledIconButton(
+            onClick = { showTrackSelectionDialog = true },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
+        ) {
+            Icon(Icons.Default.Settings, contentDescription = "Tracks")
+        }
+    }
 }
