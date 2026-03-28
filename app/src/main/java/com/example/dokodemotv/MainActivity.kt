@@ -1,13 +1,20 @@
 package com.example.dokodemotv
 
+import android.Manifest
+import android.app.Application
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import android.view.KeyEvent
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import kotlin.OptIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -19,8 +26,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -32,30 +37,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.PlayerView
+
+// Media3関連の統合（トラック選択用のC, Tracks等を含む）
+import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
-import androidx.media3.common.C
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.PlayerView
+
 import coil.compose.rememberAsyncImagePainter
+import com.example.dokodemotv.data.preferences.SettingsRepository
 import com.example.dokodemotv.model.ChannelItem
-import android.widget.Toast
-import android.content.ActivityNotFoundException
-import android.os.Environment
-import android.os.Build
-import android.provider.Settings
-import android.net.Uri
-import android.Manifest
-import java.io.File
+import com.example.dokodemotv.service.RecordingForegroundService
+import com.example.dokodemotv.ui.settings.SettingsScreen
+import com.example.dokodemotv.ui.theme.DokodemoTVTheme
 import com.example.dokodemotv.viewmodel.PlayerViewModel
 import com.example.dokodemotv.viewmodel.DokodemoViewModelFactory
-import com.example.dokodemotv.ui.theme.DokodemoTVTheme
-import kotlinx.coroutines.launch
+import java.io.File
+import kotlin.OptIn
 import kotlinx.coroutines.delay
-import com.example.dokodemotv.ui.SettingsScreen
-import android.app.Application
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -303,6 +306,14 @@ val permissionLauncher = rememberLauncherForActivityResult(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
+                    var showSettings by remember { mutableStateOf(false) }
+                    ElevatedButton(
+                        onClick = { showSettings = true },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text("⚙️ Settings")
+                    }
                     ElevatedButton(
                         onClick = { safeLaunchFolderPicker() },
                         shape = MaterialTheme.shapes.medium,
@@ -385,6 +396,7 @@ val permissionLauncher = rememberLauncherForActivityResult(
 
 @Composable
 fun ChannelListItem(channel: ChannelItem, isSelected: Boolean, onClick: () -> Unit) {
+    val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
 
     val containerColor = when {
