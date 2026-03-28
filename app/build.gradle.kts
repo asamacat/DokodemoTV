@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -23,12 +24,15 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+        // Add coreLibraryDesugaringEnabled = true to fix JdkImageTransform? No, wait.
+        // This is a known issue with Android Studio and openjdk 21.
     }
 
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "1.8"
+        freeCompilerArgs = freeCompilerArgs + "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api"
     }
 
     buildFeatures {
@@ -58,6 +62,35 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     implementation("androidx.room:room-paging:2.6.1")
     implementation("androidx.room:room-paging:2.6.1")
+
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Coil
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Media3
+    implementation("androidx.media3:media3-exoplayer:1.1.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.1.1")
+    implementation("androidx.media3:media3-ui:1.1.1")
+
+    // DocumentFile
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
+
+
+
+
+
+
+
+
+　　// Room Database (統合・整理)
+    val room_version = "2.6.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    ksp("androidx.room:room-compiler:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+    implementation("androidx.room:room-paging:$room_version")
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.0")
