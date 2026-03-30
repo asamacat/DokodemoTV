@@ -1,0 +1,158 @@
+﻿To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.8/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+.\gradlew.bat : Warning: SD
+K processing. This version 
+only understands SDK XML ve
+rsions up to 3 but an SDK X
+ML file of version 4 was en
+countered. This can happen 
+if you use versions of Andr
+oid Studio and the command-
+line tools that were releas
+ed at different times.
+発生場所 行:1 文字:1
++ .\gradlew.bat compileDebu
+gKotlin --no-daemon > build
+_log_fixed2.txt 2 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (War  
+  ning: SDK pr...ifferen   
+ t times.:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 34
+
+This Android Gradle plugin (8.1.0) was tested up to compileSdk = 33 (and compileSdkPreview = "UpsideDownCakePrivacySandbox").
+
+You are strongly encouraged to update your project to use a newer
+Android Gradle plugin that has been tested with compileSdk = 34.
+
+If you are already using the latest version of the Android Gradle plugin,
+you may need to wait until a newer version with support for compileSdk = 34 is available.
+
+To suppress this warning, add/update
+    android.suppressUnsupportedCompileSdk=34
+to this project's gradle.properties.
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+
+> Task :app:kspDebugKotlin FAILED
+e: [ksp] C:/Users/Takama/Do
+cuments/Agent1/dokodemoTV/A
+ndroid_PoC/app/src/main/jav
+a/com/example/dokodemotv/da
+ta/local/dao/EpgDao.kt:46: 
+There is a problem with the
+ query: [SQLITE_ERROR] SQL 
+error or missing database (
+no such table: channel_mapp
+ings)
+e: [ksp] C:/Users/Takama/Do
+cuments/Agent1/dokodemoTV/A
+ndroid_PoC/app/src/main/jav
+a/com/example/dokodemotv/da
+ta/local/dao/EpgDao.kt:46: 
+Not sure how to convert a C
+ursor to this method's retu
+rn type (kotlinx.coroutines
+.flow.Flow<java.util.List<c
+om.example.dokodemotv.data.
+local.entity.ChannelMapping
+>>).
+e: [ksp] C:/Users/Takama/Do
+cuments/Agent1/dokodemoTV/A
+ndroid_PoC/app/src/main/jav
+a/com/example/dokodemotv/da
+ta/local/dao/EpgDao.kt:49: 
+There is a problem with the
+ query: [SQLITE_ERROR] SQL 
+error or missing database (
+no such table: channel_mapp
+ings)
+e: [ksp] C:/Users/Takama/Do
+cuments/Agent1/dokodemoTV/A
+ndroid_PoC/app/src/main/jav
+a/com/example/dokodemotv/da
+ta/local/dao/EpgDao.kt:49: 
+Not sure how to convert a C
+ursor to this method's retu
+rn type (java.lang.String).
+e: [ksp] C:/Users/Takama/Do
+cuments/Agent1/dokodemoTV/A
+ndroid_PoC/app/src/main/jav
+a/com/example/dokodemotv/da
+ta/local/dao/EpgDao.kt:52: 
+There is a problem with the
+ query: [SQLITE_ERROR] SQL 
+error or missing database (
+no such table: channel_mapp
+ings)
+e: [ksp] C:/Users/Takama/Do
+cuments/Agent1/dokodemoTV/A
+ndroid_PoC/app/src/main/jav
+a/com/example/dokodemotv/da
+ta/local/dao/EpgDao.kt:43: 
+com.example.dokodemotv.data
+.local.dao.EpgDao is part o
+f com.example.dokodemotv.re
+pository.DokodemoDatabase b
+ut this entity is not in th
+e database. Maybe you forgo
+t to add com.example.dokode
+motv.data.local.entity.Chan
+nelMapping to the entities 
+section of the @Database?
+e: Error occurred in KSP, c
+heck log for detail
+
+FAILURE: Build failed with 
+an exception.
+
+* What went wrong:
+Execution failed for task '
+:app:kspDebugKotlin'.
+> A failure occurred while 
+executing org.jetbrains.kot
+lin.compilerRunner.GradleCo
+mpilerRunnerWithWorkers$Gra
+dleKotlinCompilerWorkAction
+   > Compilation error. See
+ log for more details
+
+* Try:
+> Run with --stacktrace opt
+ion to get the stack trace.
+> Run with --info or --debu
+g option to get more log ou
+tput.
+> Run with --scan to get fu
+ll insights.
+> Get more help at https://
+help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.8/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 34s
+13 actionable tasks: 1 executed, 12 up-to-date

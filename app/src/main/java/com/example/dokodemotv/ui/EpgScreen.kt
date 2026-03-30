@@ -20,16 +20,26 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.dokodemotv.model.ChannelItem
 import com.example.dokodemotv.data.local.entity.EpgChannel
 import com.example.dokodemotv.data.local.entity.EpgProgram
+import com.example.dokodemotv.scheduling.RecordingScheduler
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import java.text.SimpleDateFormat
 import java.util.*
+
+
 
 @Composable
 fun EpgScreen(
     channels: List<ChannelItem>,
     onChannelSelected: (ChannelItem) -> Unit,
+    onBack: () -> Unit,
     epgViewModel: EpgViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val epgChannels by epgViewModel.epgChannels.collectAsState()
+
     val activePrograms by epgViewModel.activePrograms.collectAsState()
     val mappings by epgViewModel.channelMappings.collectAsState()
 
@@ -38,11 +48,15 @@ fun EpgScreen(
 
     // Mapping Dialog State
     var channelToMap by remember { mutableStateOf<ChannelItem?>(null) }
+    // Programs to schedule
+    var programToSchedule by remember { mutableStateOf<Pair<EpgProgram, ChannelItem>?>(null) }
 
-    // Group programs by mapped channel ID
+
+    // Group programs by mapped channel ID, including future ones
     val programsByChannelId = remember(activePrograms) {
         activePrograms.groupBy { it.channelId }
     }
+
 
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
@@ -53,11 +67,18 @@ fun EpgScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("TV Guide (EPG)", style = MaterialTheme.typography.titleLarge)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+                Text("TV Guide (EPG)", style = MaterialTheme.typography.titleLarge)
+            }
+
             Button(onClick = { epgViewModel.refreshEpgData() }) {
                 Text("Refresh")
             }
         }
+
 
         // Time Axis Header
         Row(
@@ -120,54 +141,72 @@ fun EpgScreen(
                     }
 
                     // Program Track
-                    Box(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(horizontalScrollState)
                     ) {
-                        if (currentProgram != null) {
-                            Box(
-                                modifier = Modifier
-                                    .width(300.dp) // Fixed width for simplicity in PoC
-                                    .fillMaxHeight()
-                                    .padding(4.dp)
-                                    .background(MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small)
-                                    .padding(8.dp)
-                            ) {
-                                Column {
-                                    Text(
-                                        text = "\${timeFormat.format(Date(currentProgram.startTime))} - \${timeFormat.format(Date(currentProgram.endTime))}",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                    )
-                                    Text(
-                                        text = currentProgram.title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                        val programs = mappedTvgId?.let { programsByChannelId[it] } ?: emptyList()
+                        if (programs.isNotEmpty()) {
+                            programs.sortedBy { it.startTime }.forEach { program ->
+                                val isNow = program.startTime <= currentTime && program.endTime > currentTime
+                                Box(
+                                    modifier = Modifier
+                                        .width(250.dp)
+                                        .fillMaxHeight()
+                                        .padding(4.dp)
+                                        .background(
+                                            if (isNow) MaterialTheme.colorScheme.primaryContainer 
+                                            else MaterialTheme.colorScheme.surfaceVariant, 
+                                            shape = MaterialTheme.shapes.small
+                                        )
+                                        .clickable {
+                                            if (program.endTime > currentTime) {
+                                                programToSchedule = program to channel
+                                            }
+                                        }
+                                        .padding(8.dp)
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "\${timeFormat.format(Date(program.startTime))} - \${timeFormat.format(Date(program.endTime))}",
+                                            fontSize = 11.sp,
+                                            color = if (isNow) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) 
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                        Text(
+                                            text = program.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (isNow) MaterialTheme.colorScheme.onPrimaryContainer 
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .width(300.dp)
+                                    .width(250.dp)
                                     .fillMaxHeight()
                                     .padding(4.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.small)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = MaterialTheme.shapes.small)
                                     .padding(8.dp),
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 Text(
-                                    text = "設定なし (Not Configured)",
+                                    text = "設定なし (No Data)",
+                                    fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                 )
                             }
                         }
                     }
+
                 }
                 Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
             }
         }
     }
@@ -200,6 +239,7 @@ fun EpgScreen(
                                     Text("Unmap (Use Default)", color = MaterialTheme.colorScheme.error)
                                 }
                                 Divider()
+
                             }
                             items(epgChannels) { epgChannel ->
                                 Row(
@@ -214,6 +254,7 @@ fun EpgScreen(
                                     Text(epgChannel.displayName)
                                 }
                                 Divider()
+
                             }
                         }
                     }
@@ -226,4 +267,45 @@ fun EpgScreen(
             }
         }
     }
+
+    // Schedule Dialog
+    if (programToSchedule != null) {
+        val (program, channel) = programToSchedule!!
+        AlertDialog(
+            onDismissRequest = { programToSchedule = null },
+            title = { Text("番組予約") },
+            text = {
+                Column {
+                    Text(program.title, style = MaterialTheme.typography.titleMedium)
+                    Text("\${timeFormat.format(Date(program.startTime))} - \${timeFormat.format(Date(program.endTime))}")
+                    Text("チャンネル: \${channel.name}")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val scheduler = RecordingScheduler(context)
+                        scheduler.scheduleRecording(
+                            com.example.dokodemotv.scheduling.ScheduledRecording(
+                                id = program.hashCode(),
+                                startTimeMs = program.startTime,
+                                url = channel.streamUrl,
+                                fileName = "\${channel.name}_\${program.title}_\${System.currentTimeMillis()}.ts"
+                            )
+                        )
+                        Toast.makeText(context, "録画予約しました: \${program.title}", Toast.LENGTH_SHORT).show()
+                        programToSchedule = null
+                    }
+                ) {
+                    Text("録画予約")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { programToSchedule = null }) {
+                    Text("キャンセル")
+                }
+            }
+        )
+    }
 }
+

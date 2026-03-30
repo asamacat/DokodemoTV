@@ -26,8 +26,10 @@ data class RecordingSettings(
     val nasIp: String,
     val nasShare: String,
     val nasUser: String,
-    val nasPass: String
+    val nasPass: String,
+    val epgUrl: String
 )
+
 
 class SettingsRepository(private val context: Context) {
 
@@ -37,6 +39,8 @@ class SettingsRepository(private val context: Context) {
     private val NAS_SHARE_KEY = stringPreferencesKey("nas_share")
     private val NAS_USER_KEY = stringPreferencesKey("nas_user")
     private val NAS_PASS_KEY = stringPreferencesKey("nas_pass")
+    private val EPG_URL_KEY = stringPreferencesKey("epg_url")
+
 
     val settingsFlow: Flow<RecordingSettings> = context.dataStore.data
         .map { preferences ->
@@ -49,8 +53,10 @@ class SettingsRepository(private val context: Context) {
                 nasIp = preferences[NAS_IP_KEY] ?: "",
                 nasShare = preferences[NAS_SHARE_KEY] ?: "Public",
                 nasUser = preferences[NAS_USER_KEY] ?: "guest",
-                nasPass = preferences[NAS_PASS_KEY] ?: ""
+                nasPass = preferences[NAS_PASS_KEY] ?: "",
+                epgUrl = preferences[EPG_URL_KEY] ?: ""
             )
+
         }
 
     suspend fun updateEngine(engine: RecordingEngine) {
@@ -73,4 +79,11 @@ class SettingsRepository(private val context: Context) {
             preferences[NAS_PASS_KEY] = pass
         }
     }
+
+    suspend fun updateEpgUrl(url: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EPG_URL_KEY] = url
+        }
+    }
 }
+

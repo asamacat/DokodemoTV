@@ -22,12 +22,13 @@ class EpgParser {
     }
 
     data class ParseResult(
-        val channels: List<EpgChannel>,
-        val programs: List<EpgProgram>
+        val channels: List<EpgChannel> = emptyList(),
+        val programs: List<EpgProgram> = emptyList()
     )
 
+
     @Throws(XmlPullParserException::class, IOException::class)
-    fun parse(inputStream: InputStream): ParseResult {
+    fun parseXml(inputStream: InputStream): ParseResult {
         inputStream.use {
             val parser: XmlPullParser = Xml.newPullParser()
             parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -36,6 +37,52 @@ class EpgParser {
             return readTv(parser)
         }
     }
+
+    /**
+     * Parse EPG from CSV format:
+     * channel_id, start_time (YYYY-MM-DD HH:MM), end_time (YYYY-MM-DD HH:MM), title, description
+     */
+    fun parseCsv(inputStream: InputStream): ParseResult {
+        val channels = mutableSetOf<EpgChannel>()
+        val programs = mutableListOf<EpgProgram>()
+        val csvDateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
+        try {
+            inputStream.bufferedReader().use { reader ->
+                reader.forEachLine { line ->
+                    val parts = line.split(",").map { it.trim() }
+                    if (parts.size >= 4) {
+                        val channelId = parts[0]
+                        val startTimeStr = parts[1]
+                        val endTimeStr = parts[2]
+                        val title = parts[3]
+                        val description = parts.getOrNull(4)
+
+                        val startTime = runCatching { csvDateFormat.parse(startTimeStr)?.time }.getOrNull() ?: 0L
+                        val endTime = runCatching { csvDateFormat.parse(endTimeStr)?.time }.getOrNull() ?: 0L
+
+                        if (channelId.isNotEmpty() && title.isNotEmpty() && startTime > 0) {
+                            channels.add(EpgChannel(channelId, channelId, null))
+                            programs.add(
+                                EpgProgram(
+                                    channelId = channelId,
+                                    title = title,
+                                    description = description,
+                                    startTime = startTime,
+                                    endTime = endTime
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing EPG CSV", e)
+        }
+
+        return ParseResult(channels.toList(), programs)
+    }
+
 
     @Throws(XmlPullParserException::class, IOException::class)
     private fun readTv(parser: XmlPullParser): ParseResult {

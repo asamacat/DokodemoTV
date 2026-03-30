@@ -53,39 +53,13 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-tooling-preview")
+
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
 
-    // Room
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    implementation("androidx.room:room-paging:2.6.1")
-    implementation("androidx.room:room-paging:2.6.1")
-
-    // WorkManager
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
-
-    // Coil
-    implementation("io.coil-kt:coil-compose:2.6.0")
-
-    // Media3
-    implementation("androidx.media3:media3-exoplayer:1.1.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.1.1")
-    implementation("androidx.media3:media3-ui:1.1.1")
-
-    // DocumentFile
-    implementation("androidx.documentfile:documentfile:1.0.1")
-
-
-
-
-
-
-
-
-
-　　// Room Database (統合・整理)
+    // Room Database
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
@@ -114,4 +88,4 @@ dependencies {
 
     // OkHttp for Custom Downloader
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-}
+}

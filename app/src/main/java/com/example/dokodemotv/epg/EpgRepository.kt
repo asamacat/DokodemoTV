@@ -5,11 +5,14 @@ import android.util.Log
 import com.example.dokodemotv.data.local.dao.EpgDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
 import java.net.URL
+import java.net.HttpURLConnection
 import java.util.Date
+import java.io.InputStream
 
 class EpgRepository(private val epgDao: EpgDao, private val context: Context) {
+
+
 
     companion object {
         private const val TAG = "EpgRepository"
@@ -47,7 +50,13 @@ class EpgRepository(private val epgDao: EpgDao, private val context: Context) {
 
             connection.inputStream.use { inputStream ->
                 val parser = EpgParser()
-                val (channels, programs) = parser.parse(inputStream)
+                val parseResult = if (urlStr.endsWith(".csv", ignoreCase = true)) {
+                    parser.parseCsv(inputStream)
+                } else {
+                    parser.parseXml(inputStream)
+                }
+                val (channels, programs) = parseResult
+
 
                 Log.d(TAG, "Parsed \${channels.size} channels and \${programs.size} programs.")
 
@@ -78,9 +87,26 @@ class EpgRepository(private val epgDao: EpgDao, private val context: Context) {
         Log.d(TAG, "Deleted programs older than \${Date(cutoffTime)}")
     }
 
+    suspend fun updateEpgFromInputStream(inputStream: InputStream, isCsv: Boolean) = withContext(Dispatchers.IO) {
+        try {
+            val parser = EpgParser()
+            val parseResult = if (isCsv) {
+                parser.parseCsv(inputStream)
+            } else {
+                parser.parseXml(inputStream)
+            }
+            epgDao.clearAndInsertEpgData(parseResult.channels, parseResult.programs)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating EPG from InputStream", e)
+            false
+        }
+    }
+
     fun getEpgForChannel(tvgId: String) = epgDao.getProgramsForChannel(tvgId, System.currentTimeMillis())
 
     fun getAllEpgChannels() = epgDao.getAllEpgChannels()
 
     fun getAllChannelMappings() = epgDao.getAllChannelMappings()
 }
+

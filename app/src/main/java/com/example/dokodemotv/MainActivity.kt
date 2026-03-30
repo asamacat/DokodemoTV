@@ -8,35 +8,40 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.provider.Settings
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.Modifier
+import android.provider.Settings
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.focus.FocusRequester
+
+
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.dokodemotv.ui.EpgScreen
+
 
 // Media3関連の統合（トラック選択用のC, Tracks等を含む）
 import androidx.media3.common.C
@@ -61,6 +66,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -78,8 +84,9 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel(factory = DokodemoViewM
     val sources by viewModel.sources.collectAsState()
     var selectedUrl by remember { mutableStateOf<String?>(viewModel.initialUrl) }
     var showSettings by remember { mutableStateOf(false) }
+    var showEpg by remember { mutableStateOf(false) }
+    val isRecording by viewModel.isRecording.collectAsState()
 
-    // Flat list of all channels for zapping
     val allChannels = remember(sources) {
         sources.flatMap { it.channels }
     }
@@ -87,6 +94,10 @@ fun DokodemoTVApp(viewModel: PlayerViewModel = viewModel(factory = DokodemoViewM
     var showBottomSheet by remember { mutableStateOf(false) }
     var selectedTabIndex by remember { mutableStateOf(0) }
     var showMenuButton by remember { mutableStateOf(true) }
+
+    val settingsRepository = remember { SettingsRepository(context) }
+
+
 
     var zapMessage by remember { mutableStateOf<String?>(null) }
 
@@ -194,9 +205,23 @@ val permissionLauncher = rememberLauncherForActivityResult(
     }
 
     if (showSettings) {
-        SettingsScreen(viewModel = viewModel, onBack = { showSettings = false })
+        SettingsScreen(settingsRepository = settingsRepository, onNavigateBack = { showSettings = false })
         return
     }
+
+    if (showEpg) {
+        EpgScreen(
+            channels = allChannels,
+            onChannelSelected = { 
+                selectedUrl = it.streamUrl
+                showEpg = false
+            },
+            onBack = { showEpg = false }
+        )
+        return
+    }
+
+
 
     Scaffold { padding ->
         Box(
@@ -244,20 +269,59 @@ val permissionLauncher = rememberLauncherForActivityResult(
             )
 
             if (showMenuButton) {
-                // Top Left Menu Button
-                FilledIconButton(
-                    onClick = { showBottomSheet = true },
+                // Top Left Action Bar
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(16.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = "Menu")
+                    FilledIconButton(
+                        onClick = { showBottomSheet = true },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+                    }
+
+                    FilledIconButton(
+                        onClick = { showEpg = true },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(Icons.Default.List, contentDescription = "TV Guide")
+                    }
+
+                    val currentChannel = allChannels.find { it.streamUrl == selectedUrl }
+                    if (currentChannel != null) {
+                        FilledIconButton(
+                            onClick = {
+                                if (isRecording) {
+                                    viewModel.stopRecording()
+                                } else {
+                                    viewModel.startRecording(currentChannel.streamUrl, "${currentChannel.name}_${System.currentTimeMillis()}.ts")
+                                }
+                            },
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = if (isRecording) MaterialTheme.colorScheme.error.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                contentColor = if (isRecording) Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+
+                        ) {
+                            Icon(
+                                imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord,
+                                contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
+                                tint = if (isRecording) Color.Red else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 }
             }
+
 
             // Zap Message Overlay
             if (zapMessage != null) {
@@ -306,9 +370,8 @@ val permissionLauncher = rememberLauncherForActivityResult(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    var showSettings by remember { mutableStateOf(false) }
                     ElevatedButton(
-                        onClick = { showSettings = true },
+                        onClick = { showBottomSheet = false; showSettings = true },
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
@@ -321,14 +384,8 @@ val permissionLauncher = rememberLauncherForActivityResult(
                     ) {
                         Text("📁 Load Folder")
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    ElevatedButton(
-                        onClick = { showBottomSheet = false; showSettings = true },
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Text("⚙️ Settings")
-                    }
                 }
+
 
                 if (sources.isNotEmpty()) {
                     ScrollableTabRow(

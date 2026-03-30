@@ -19,21 +19,29 @@ import com.example.dokodemotv.util.CacheManager
 import com.example.dokodemotv.util.PreferencesManager
 import com.example.dokodemotv.repository.DokodemoDatabase
 import com.example.dokodemotv.model.AppSetting
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import com.example.dokodemotv.epg.EpgRepository
+import com.example.dokodemotv.service.RecordingForegroundService
+import com.example.dokodemotv.data.preferences.SettingsRepository
+import com.example.dokodemotv.data.local.dao.EpgDao
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import java.io.File
 
 data class ChannelSource(val name: String, val channels: List<ChannelItem>)
 
+
+
 class PlayerViewModel(
     application: Application,
     private val database: DokodemoDatabase? = null
 ) : AndroidViewModel(application) {
     private val prefs = PreferencesManager(application)
+    private val settingsRepository = SettingsRepository(application)
+    private val epgRepository = EpgRepository(database!!.epgDao(), application)
+    
     var exoPlayer: ExoPlayer
+
     private var currentUrl: String? = null
 
     val initialUrl: String?
@@ -48,7 +56,13 @@ class PlayerViewModel(
     private val _sleepTimerFlow = MutableStateFlow("Off")
     val sleepTimerFlow: StateFlow<String> = _sleepTimerFlow
 
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording = _isRecording.asStateFlow()
+
+    val settings = settingsRepository.settingsFlow
+
     private var sleepTimerJob: kotlinx.coroutines.Job? = null
+
 
     init {
         exoPlayer = buildPlayer()
@@ -210,9 +224,41 @@ class PlayerViewModel(
 
         // We don't save the URI for File paths because it's a fixed fallback path.
         _sources.value = newSources
+
+        // Also check for epg.csv or epg.xml in the same folder
+        viewModelScope.launch {
+            val epgCsv = File(folder, "epg.csv")
+            if (epgCsv.exists()) {
+                epgRepository.updateEpgFromInputStream(epgCsv.inputStream(), isCsv = true)
+            } else {
+                val epgXml = File(folder, "epg.xml")
+                if (epgXml.exists()) {
+                    epgRepository.updateEpgFromInputStream(epgXml.inputStream(), isCsv = false)
+                }
+            }
+        }
+    }
+
+    fun startRecording(url: String, fileName: String) {
+        val intent = Intent(getApplication(), RecordingForegroundService::class.java).apply {
+            action = RecordingForegroundService.ACTION_START_RECORDING
+            putExtra(RecordingForegroundService.EXTRA_URL, url)
+            putExtra(RecordingForegroundService.EXTRA_FILENAME, fileName)
+        }
+        getApplication<Application>().startForegroundService(intent)
+        _isRecording.value = true
+    }
+
+    fun stopRecording() {
+        val intent = Intent(getApplication(), RecordingForegroundService::class.java).apply {
+            action = RecordingForegroundService.ACTION_STOP_RECORDING
+        }
+        getApplication<Application>().startService(intent)
+        _isRecording.value = false
     }
 
     override fun onCleared() {
+
         super.onCleared()
         exoPlayer.release()
     }

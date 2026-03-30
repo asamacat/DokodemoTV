@@ -9,62 +9,84 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
+import com.example.dokodemotv.data.preferences.SettingsRepository
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
+
 
 object EpgManager {
     private const val EPG_WORK_NAME = "epg_update_work"
     private const val TAG = "EpgManager"
 
-    // Configured EPG Sources. In a real app, these would come from SharedPreferences or a local file.
-    val epgSources = listOf(
-        "https://example.com/epg.xml" // Placeholder
-    )
-
-    fun schedulePeriodicEpgUpdate(context: Context) {
-        if (epgSources.isEmpty()) return
-
-        Log.d(TAG, "Scheduling periodic EPG updates every 12 hours.")
-
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-
-        val inputData = Data.Builder()
-            .putStringArray(EpgUpdateWorker.KEY_URLS, epgSources.toTypedArray())
-            .build()
-
-        val epgWorkRequest = PeriodicWorkRequestBuilder<EpgUpdateWorker>(
-            12, TimeUnit.HOURS,
-            30, TimeUnit.MINUTES // Flex interval
-        )
-        .setConstraints(constraints)
-        .setInputData(inputData)
-        .build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            EPG_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP, // Keep existing schedule if it's already running
-            epgWorkRequest
-        )
+    // Configured EPG Sources. Now fetched from SettingsRepository.
+    private suspend fun getEpgSources(context: Context): List<String> {
+        val settings = SettingsRepository(context).settingsFlow.first()
+        return if (settings.epgUrl.isNotBlank()) {
+            listOf(settings.epgUrl)
+        } else {
+            emptyList()
+        }
     }
 
-    fun triggerImmediateUpdate(context: Context) {
-        if (epgSources.isEmpty()) return
-        Log.d(TAG, "Triggering immediate EPG update.")
 
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
+    fun schedulePeriodicEpgUpdate(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val sources = getEpgSources(context)
+            if (sources.isEmpty()) return@launch
 
-        val inputData = Data.Builder()
-            .putStringArray(EpgUpdateWorker.KEY_URLS, epgSources.toTypedArray())
-            .build()
+            Log.d(TAG, "Scheduling periodic EPG updates for \${sources.size} sources.")
 
-        val oneTimeRequest = OneTimeWorkRequestBuilder<EpgUpdateWorker>()
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
+            val inputData = Data.Builder()
+                .putStringArray(EpgUpdateWorker.KEY_URLS, sources.toTypedArray())
+                .build()
+
+            val epgWorkRequest = PeriodicWorkRequestBuilder<EpgUpdateWorker>(
+                12, TimeUnit.HOURS,
+                30, TimeUnit.MINUTES // Flex interval
+            )
             .setConstraints(constraints)
             .setInputData(inputData)
             .build()
 
-        WorkManager.getInstance(context).enqueue(oneTimeRequest)
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                EPG_WORK_NAME,
+                ExistingPeriodicWorkPolicy.UPDATE, // Update schedule to use new URLs
+                epgWorkRequest
+            )
+        }
     }
+
+
+    fun triggerImmediateUpdate(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val sources = getEpgSources(context)
+            if (sources.isEmpty()) return@launch
+            
+            Log.d(TAG, "Triggering immediate EPG update for \${sources.size} sources.")
+
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
+            val inputData = Data.Builder()
+                .putStringArray(EpgUpdateWorker.KEY_URLS, sources.toTypedArray())
+                .build()
+
+            val oneTimeRequest = OneTimeWorkRequestBuilder<EpgUpdateWorker>()
+                .setConstraints(constraints)
+                .setInputData(inputData)
+                .build()
+
+            WorkManager.getInstance(context).enqueue(oneTimeRequest)
+        }
+    }
+
 }

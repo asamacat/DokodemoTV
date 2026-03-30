@@ -9,10 +9,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.dokodemotv.data.preferences.StorageType
 import com.example.dokodemotv.data.preferences.RecordingEngine
 import com.example.dokodemotv.data.preferences.SettingsRepository
-import com.example.dokodemotv.data.preferences.StorageType
+import com.example.dokodemotv.epg.EpgManager
 import kotlinx.coroutines.launch
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,6 +22,7 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     settingsRepository: SettingsRepository
 ) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val settingsState by settingsRepository.settingsFlow.collectAsState(initial = null)
 
@@ -142,6 +145,37 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Text("EPG (TV Guide) Settings", style = MaterialTheme.typography.titleMedium)
+            var epgUrl by remember(settings.epgUrl) { mutableStateOf(settings.epgUrl) }
+            
+            OutlinedTextField(
+                value = epgUrl,
+                onValueChange = { epgUrl = it },
+                label = { Text("XMLTV / EPG CSV URL") },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("https://example.com/epg.xml") }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            settingsRepository.updateEpgUrl(epgUrl)
+                            EpgManager.triggerImmediateUpdate(context)
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Save & Sync Now")
+                }
+            }
         }
     }
+
 }
